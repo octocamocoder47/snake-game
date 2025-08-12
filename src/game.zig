@@ -1,5 +1,9 @@
 const std = @import("std");
-const rl = @import("raylib");
+const rl = @import("raylib.zig").raylib;
+// const rl = @import("raylib");
+// const rl = @cImport({
+//     @cInclude("raylib.h");
+// });
 const ArrayList = std.ArrayList;
 
 pub const screenWidth = 640 * 2;

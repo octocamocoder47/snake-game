@@ -1,4 +1,8 @@
-const rl = @import("raylib");
+const rl = @import("raylib.zig").raylib;
+// const rl = @import("raylib");
+// const rl = @cImport({
+//     @cInclude("raylib.h");
+// });
 const std = @import("std");
 const Game = @import("game.zig").Game;
 

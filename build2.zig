@@ -46,7 +46,7 @@ pub fn build(b: *std.Build) void {
     });
 
     // Raylib Zig bindings (for types/imports). Note: binding package must be declared in build.zig.zon.
-    const raylib_dep = b.dependency("raylib", .{
+    const raylib_dep = b.dependency("raylib_zig", .{
         .target = wasm_target,
         .optimize = optimize,
     });
@@ -71,7 +71,7 @@ pub fn build(b: *std.Build) void {
 
     // === IMPORTANT: Path to the libraylib.a you compiled with emscripten ===
     // Replace this with the absolute path where the Emscripten-built libraylib.a exists.
-    const raylib_wasm_a = b.path("/workspaces/zig/game-dev/proj2/raylib/src/libraylib.a");
+    const raylib_wasm_a = b.path("/absolute/path/to/raylib/src/libraylib.a");
 
     // Build final output with emcc (link Zig emitted object + libraylib.a)
     const emcc = b.addSystemCommand(&.{"emcc"});
