@@ -8,157 +8,172 @@ const Screens = @import("screens.zig").Screens;
 
 // const print = std.debug.print;
 
-pub fn main() !void {
-    const w = globals.screenWidth / globals.cellsize;
-    const h = globals.screenHeight / globals.cellsize;
+const is_wasm = @import("builtin").target.ofmt == .wasm;
 
+var screens: Screens = undefined;
+var game: ?*Game = null;
+var previoustime: i128 = 0;
+var pause: bool = false;
+
+pub const MainLoopCallback = *const fn () callconv(.c) void;
+extern fn emscripten_set_main_loop(MainLoopCallback, c_int, c_int) void;
+pub fn setMainLoop(cb: MainLoopCallback, maybe_fps: ?i16, simulate_infinite_loop: bool) void {
+    emscripten_set_main_loop(cb, if (maybe_fps) |fps| fps else -1, @intFromBool(simulate_infinite_loop));
+}
+
+pub fn main() !void {
     rl.initWindow(globals.screenWidth, globals.screenHeight, "Snake Game");
-    defer rl.closeWindow();
     rl.setTargetFPS(60);
 
-    var screens = Screens.init();
-    var game: ?*Game = null;
-
-    var previoustime = std.time.nanoTimestamp();
-    var pause = false;
+    const allocator: std.mem.Allocator = std.heap.c_allocator;
+    screens = .init(allocator);
 
     while (!rl.windowShouldClose()) {
-        rl.beginDrawing();
-
-        switch (screens.current) {
-            .Menu => {
-                screens.drawMenu();
-                try screens.updateMenu(&game, w, h);
-            },
-            .Playing => {
-                if (game) |g| {
-                    // Pause toggle
-                    if (rl.isKeyPressed(.p)) {
-                        pause = !pause;
-                    }
-
-                    if (!pause) {
-                        // Handle movement input
-                        g.input();
-
-                        // Frame timing
-                        const now = std.time.nanoTimestamp();
-                        if (now - previoustime >= globals.frametime) {
-                            previoustime = now;
-                            try g.move();
-                        }
-
-                        rl.clearBackground(rl.Color.black);
-                        screens.drawPlaying(g, globals.cellsize);
-
-                        // Collision check -> game over
-                        if (g.collisionDetection()) {
-                            if (g.snake.items.len > screens.high_score) {
-                                screens.high_score = g.snake.items.len;
-                            }
-                            screens.current = .GameOver;
-                        }
-                    } else {
-                        // Optional: show pause overlay
-                        drawPauseOverlay();
-                    }
-                }
-            },
-            .GameOver => {
-                screens.drawGameOver(&game);
-                screens.updateGameOver(&game);
-            },
-            .HighScore => { screens.drawHighScore(); screens.updateHighScore(); },
-        }
-
-        rl.endDrawing();
+        try loop();
     }
+
+    if (!is_wasm) {
+        rl.closeWindow();
+    }
+}
+
+fn loop() !void {
+    const w = globals.screenWidth / globals.cellsize;
+    const h = globals.screenHeight / globals.cellsize;
+    rl.beginDrawing();
+
+    switch (screens.current) {
+        .Menu => {
+            screens.drawMenu();
+            try screens.updateMenu(&game, w, h);
+        },
+        .Playing => {
+            if (game) |g| {
+                // Pause toggle
+                if (rl.isKeyPressed(.p)) {
+                    pause = !pause;
+                }
+
+                if (!pause) {
+                    // Handle movement input
+                    g.input();
+
+                    // Frame timing
+                    const now = std.time.nanoTimestamp();
+                    if (now - previoustime >= globals.frametime) {
+                        previoustime = now;
+                        try g.move();
+                    }
+
+                    rl.clearBackground(rl.Color.black);
+                    screens.drawPlaying(g, globals.cellsize);
+
+                    // Collision check -> game over
+                    if (g.collisionDetection()) {
+                        if (g.snake.items.len > screens.high_score) {
+                            screens.high_score = g.snake.items.len;
+                        }
+                        screens.current = .GameOver;
+                    }
+                } else {
+                    // Optional: show pause overlay
+                    drawPauseOverlay();
+                }
+            }
+        },
+        .GameOver => {
+            screens.drawGameOver(&game);
+            screens.updateGameOver(&game);
+        },
+        .HighScore => {
+            screens.drawHighScore();
+            screens.updateHighScore();
+        },
+    }
+
+    rl.endDrawing();
 }
 
 fn drawPauseOverlay() void {
     Screens.drawCenteredText("Paused", .{}, @divTrunc(rl.getScreenHeight(), 2), 30, rl.Color.yellow);
 }
 
+// pub fn main2() !void {
+//     const w = globals.screenWidth / globals.cellsize;
+//     const h = globals.screenHeight / globals.cellsize;
 
+//     rl.initWindow(globals.screenWidth, globals.screenHeight, "Snake Game");
+//     defer rl.closeWindow();
+//     rl.setTargetFPS(60);
 
-pub fn main2() !void {
-    const w = globals.screenWidth / globals.cellsize;
-    const h = globals.screenHeight / globals.cellsize;
+//     var screens = Screens.init();
+//     var game: ?*Game = null;
 
-    rl.initWindow(globals.screenWidth, globals.screenHeight, "Snake Game");
-    defer rl.closeWindow();
-    rl.setTargetFPS(60);
+//     while (!rl.windowShouldClose()) {
+//         rl.beginDrawing();
 
-    var screens = Screens.init();
-    var game: ?*Game = null;
+//         switch (screens.current) {
+//             .Menu => {
+//                 screens.drawMenu();
+//                 try screens.updateMenu(&game, w, h);
+//             },
+//             .Playing => {
+//                 if (game) |g| {
+//                     screens.drawPlaying(g, globals.cellsize);
+//                     try screens.updatePlaying(g);
+//                 }
+//             },
+//             .GameOver => {
+//                 screens.drawGameOver();
+//                 screens.updateGameOver(&game);
+//             },
+//         }
 
-    while (!rl.windowShouldClose()) {
-        rl.beginDrawing();
+//         rl.endDrawing();
+//     }
+// }
 
-        switch (screens.current) {
-            .Menu => {
-                screens.drawMenu();
-                try screens.updateMenu(&game, w, h);
-            },
-            .Playing => {
-                if (game) |g| {
-                    screens.drawPlaying(g, globals.cellsize);
-                    try screens.updatePlaying(g);
-                }
-            },
-            .GameOver => {
-                screens.drawGameOver();
-                screens.updateGameOver(&game);
-            },
-        }
+// pub fn main3() !void {
+//     rl.initWindow(globals.screenWidth, globals.screenHeight, "Snake Game");
+//     defer rl.closeWindow();
+//     // rl.setWindowPosition(100, 100);
+//     rl.setTargetFPS(60);
 
-        rl.endDrawing();
-    }
-}
+//     const w = globals.screenWidth / globals.cellsize;
+//     const h = globals.screenHeight / globals.cellsize;
 
+//     var game = Game.init(std.heap.page_allocator, w, h) catch {
+//         std.debug.print("Failed to initialize game\n", .{});
+//         return;
+//     };
 
-pub fn main3() !void {
-    rl.initWindow(globals.screenWidth, globals.screenHeight, "Snake Game");
-    defer rl.closeWindow();
-    // rl.setWindowPosition(100, 100);
-    rl.setTargetFPS(60);
+//     defer game.deinit();
+//     var previoustime = std.time.nanoTimestamp();
+//     var pause = false;
 
-    const w = globals.screenWidth / globals.cellsize;
-    const h = globals.screenHeight / globals.cellsize;
+//     while (!rl.windowShouldClose()) {
+//         rl.beginDrawing();
+//         defer rl.endDrawing();
+//         if (rl.isKeyDown(.q)) break;
+//         if (rl.isKeyPressed(.p)) {
+//             pause = !pause;
+//             continue;
+//         }
 
-    var game = Game.init(std.heap.page_allocator, w, h) catch {
-        std.debug.print("Failed to initialize game\n", .{});
-        return;
-    };
+//         if (!pause) {
+//             game.input();
+//             const now = std.time.nanoTimestamp();
+//             if (now - previoustime >= globals.frametime) {
+//                 previoustime = now;
+//                 try game.move();
+//             }
 
-    defer game.deinit();
-    var previoustime = std.time.nanoTimestamp();
-    var pause = false;
-
-    while (!rl.windowShouldClose()) {
-        rl.beginDrawing();
-        defer rl.endDrawing();
-        if (rl.isKeyDown(.q)) break;
-        if(rl.isKeyPressed(.p)) {
-            pause = !pause;
-            continue;
-        }
-
-        if(!pause) {
-            game.input();
-            const now = std.time.nanoTimestamp();
-            if (now - previoustime >= globals.frametime) {
-                previoustime = now;
-                try game.move();
-            }
-
-            rl.clearBackground(rl.Color.black);
-            game.draw();
-            if (game.collisionDetection()) break;
-
-        }
-    }
-}
+//             rl.clearBackground(rl.Color.black);
+//             game.draw();
+//             if (game.collisionDetection()) break;
+//         }
+//     }
+// }
 
 //     print("****************************\n", .{});
 //     print("Your final point is {}\n", .{game.snake.items.len - 1});
