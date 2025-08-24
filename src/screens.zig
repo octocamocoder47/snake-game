@@ -10,12 +10,14 @@ const ScreenType = enum {
 };
 
 pub const Screens = struct {
+    allocator: std.mem.Allocator,
     current: ScreenType,
     high_score: usize,
     last_score: usize,
 
-    pub fn init() Screens {
+    pub fn init(allocator: std.mem.Allocator) Screens {
         return Screens{
+            .allocator = allocator,
             .current = .Menu,
             .high_score = 0,
             .last_score = 0,
@@ -86,7 +88,7 @@ pub const Screens = struct {
 
         if (rl.isMouseButtonPressed(.left)) {
             if (rl.checkCollisionPointRec(mousePos, startBtn)) {
-                game_ptr.* = try Game.init(std.heap.page_allocator, w, h);
+                game_ptr.* = try Game.init(self.allocator, w, h);
                 self.last_score = 0;
                 self.current = .Playing;
             } else if (rl.checkCollisionPointRec(mousePos, scoreBtn)) {
